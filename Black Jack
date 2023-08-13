@@ -1,0 +1,209 @@
+import random, sys
+
+HEARTS = chr(9829)
+DIAMONDS = chr(9830)
+SPADES = chr(9824)
+CLUBS = chr(9827)
+BACKSIDE = "backside"
+
+def main():
+    print("Blackjack")
+    print("(H)it pro vzít další kartu.(S)tand pro přestání brát karty.Při prvním tahu můžete (D)ouble down")
+
+    money = 5000
+    while True:
+        if money <= 0:
+            print("You are broke!")
+            print("Good thing you weren't playing with real money.")
+            print("Thanks for playing.")
+            sys.exit()
+
+        #Nechá hráče zadat sázku pro toto kolo.
+        print("Money:", money)
+        bet = getBet(money)
+
+        #Dá krupierovi/dealerovi a hráči po dvou kartách z balíčku.
+        deck = getDeck()
+        dealerHand = [deck.pop(), deck.pop()]
+        playerHand = [deck.pop(), deck.pop()]
+
+        #Akce hráče.
+        print("Bet", bet)
+        while True:                             #Cyklus pokračuje dokud hřáč pokračuje nebo končí.
+            displayHands(playerHand, dealerHand, False)
+            print()
+
+            #Podmínka kontroluje zda hráč končí.
+            if getHandValue(playerHand) > 21:
+                break
+
+            #Proměnná move určuje pohyb hráče H, S nebo D.
+            move = getMove(playerHand, money - bet)
+
+            #Akce hráče.
+            if move == "D":
+                #Hráč zdvojnásobuje, může zvíšit sázku.
+                additionalBet = getBet(min(bet,(money - bet)))
+                bet += additionalBet
+                print("Bet increased to {}. ".format(bet))
+                print("Bet:", bet)
+
+            if move in ("H", "D"):
+                #Zdvojnásobení znamená další kartu.
+                newCard = deck.pop()
+                rank, suit = newCard
+                print("You drew a {} of {}.".format(rank, suit))
+                playerHand.append(newCard)
+
+                if getHandValue(playerHand) > 21:
+                    #Hráč prohráhl.
+                    continue
+
+                if move in ("S", "D"):
+                    #Pozastavení/zdvojení zastaví hráče na tahu.
+                    break
+
+        #Akce krupiéra
+        if getHandValue(playerHand) <= 21:
+            while getHandValue(dealerHand) < 17:
+                #Krupiér zasáhne
+                print("Dealer hits...")
+                dealerHand.append(deck.pop())
+                displayHands(playerHand, dealerHand, False)
+
+                if getHandValue(dealerHand) > 21:
+                    break #krupiér prohrál.
+                input("Press Enter to continue...")
+                print("\n\n")
+
+        #Show the final hands.
+        displayHands(playerHand, dealerHand, True)
+
+        playerValue = getHandValue(playerHand)
+        dealerValue = getHandValue(dealerHand)
+        #Zjistí zda hráč prohrál, vyhral nebo remizoval.
+        if dealerValue > 21:
+            print("Dealer bust! You win ${}!".format(bet))
+            money += bet
+        elif (playerValue > 21) or (playerValue < dealerValue):
+            print("You lost!")
+            money -= bet
+        elif playerValue > dealerValue:
+            print("You won ${}!".format(bet))
+            money += bet
+        elif playerValue == dealerValue:
+            print("IT s a tie, the bet is returnded to you.")
+
+        input("Press Enter to continue...")
+        print('\n\n')
+
+def getBet(maxBet):
+    #Zeptá se hráče kolik chce v tomto kole vsadit.
+    while True: #Ptá se dokud nezadá platnou částku.
+        print("How much do you bet? (1-{}, or QUIT)".format(maxBet))
+        bet = input("> ").upper().strip()
+        if bet == "QUIT":
+            print("Thanks for playng!")
+            sys.exit()
+
+        if not bet.isdecimal():
+            continue #Když hráč nezadá enter a číslo, ptá se znovu.
+
+        bet = int(bet)
+        if 1 <= bet <= maxBet:
+            return bet #Hráč potvrdí validní sázku.
+
+def getDeck():
+    #Vrtáti seznam hodnot, barev n-tic pro všech 52 karet.
+    deck = []
+    for suit in (HEARTS, DIAMONDS, SPADES, CLUBS):
+        for rank in range(2, 11):
+            deck.append((str(rank), suit)) #Přidá očíslované karty.
+        for rank in ("J", "Q", "K", "A"):
+            deck.append((rank, suit)) #Přidá kartám oblyčeje a esa.
+    random.shuffle(deck)
+    return deck
+
+def displayHands(playerHand, dealerHand, showDealerHand):
+    #Ukažte karty hráče a dealera. Skryjte první kartu dealera, pokud je showDealerHand False.
+    print()
+    if showDealerHand:
+        print("DEALER: ", getHandValue(dealerHand))
+        displayCards(dealerHand)
+    else:
+        print("DEALER: ???")
+        #Skryje první kartu krupiéra/dealera.
+        displayCards([BACKSIDE] + dealerHand[1:])
+    #Ukáže hráči karty.
+    print("PLAYER:", getHandValue(playerHand))
+    displayCards(playerHand)
+
+def getHandValue(cards):
+    #Vrátí hodnotu karet. Obličejové karty mají hodnotu 10, esa mají hodnotu 11 nebo 1 (tato funkce vybere nejvhodnější hodnotu esa).
+    value = 0
+    numberOfAces = 0
+
+    #Přidá hodnotu ne-esových karet:
+    for card in cards:
+        rank = card[0] #card is tuple like (rank, suit)
+        if rank == "A":
+            numberOfAces += 1
+        elif rank in ("K", "Q", "J"): #Oblyčejové karty mají hodnotu 10 bodu.
+            value += 10
+        else:
+            value += int(rank) #Číslované karty stojí za svůj počet.
+
+    #Přidá hodnotu esových karet:
+    value += numberOfAces #Přidá 1 za Eso.
+    for i in range(numberOfAces):
+        #Pokud lze přidat dalších 10 bez vyřazení, udělejte to:
+        if value + 10 <= 21:
+            value += 10
+    return value
+
+def displayCards(cards):
+    #Zobrazí všechny karty v seznamu karet.
+    rows = ["", "", "", "", ""] # Text, který se zobrazí na každém řádku.
+
+    for i, card in enumerate(cards):
+        rows[0] += "______" #Vytiskne horní řádek karty.
+        if card == BACKSIDE:
+            #Vytiskne zadní stranu karet:
+            rows[1] += '|## | '
+            rows[2] += '|###| '
+            rows[3] += '|_##| '
+        else:
+            #Vytiskne přední stranu karet:
+            rank, suit, = card #Karta má tuple datovou strukturu.
+            rows[1] += '|{} | '.format(rank.ljust(2))
+            rows[2] += '| {} | '.format(suit)
+            rows[3] += '|_{}| '.format(rank.rjust(2, '_'))
+
+    #Vytiskněte každý řádek na obrazovku:
+    for row in rows:
+        print(row)
+
+def getMove(playerHand, money):
+    #Požádá hráče o jeho tah a vrátí 'H' pro zásah, 'S' pro stoj a 'D' pro double down.
+    while True: #Pokračujte ve smyčce, dokud hráč nezadá správný tah.
+        #Určete, jaké pohyby může hráč udělat:
+        moves = ["(H)it", "(S)tand"]
+
+        #Hráč může zdvojnásobit svůj první tah, což můžeme my říct, protože budou mít přesně dvě karty:
+        if len(playerHand) == 2 and money > 0:
+            moves.append("(D)ouble down")
+
+        #Vezme pohyb hráče:
+        movePrompt = ", ".join(moves) + "> "
+        move = input(movePrompt).upper()
+        if move in ("H", "S"):
+            return move #Hráč zadal platný tah.
+        if move == "D" and "(D)ouble down" in moves:
+            return move #Hráč zadal platný tah.
+
+if __name__ == "__main__":
+    main()
+
+
+
+
